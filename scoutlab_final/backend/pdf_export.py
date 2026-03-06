@@ -67,7 +67,19 @@ def _flag(nat):
     if not nat:
         return ""
     code = CC.get(str(nat).lower().strip(), "")
-    return _dl(f"https://flagcdn.com/w80/{code}.png") if code else ""
+    if not code:
+        return ""
+    url = f"https://flagcdn.com/w80/{code}.png"
+    try:
+        r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and len(r.content) > 50:
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.write(r.content)
+            tmp.close()
+            return tmp.name
+    except:
+        pass
+    return ""
 
 
 def _radar(pd):
@@ -198,7 +210,7 @@ def generate_player_report(player_data: dict) -> bytes:
     li = player_data.get("liga", "-")
     nac = str(player_data.get("nacionalidad", "-"))
 
-    y = pdf.get_y() + 3  # Bajar un poco la cabecera
+    y = pdf.get_y() + 8  # Bajar cabecera para menos carga visual arriba
 
     # ============================================
     # BLOQUE 1: Identidad (foto + nombre + escudo + bandera + valor)
@@ -210,7 +222,15 @@ def generate_player_report(player_data: dict) -> bytes:
     flp = ""
     flag_csv = str(player_data.get("flag_url", ""))
     if flag_csv.startswith("http"):
-        flp = _dl(flag_csv)
+        try:
+            r = requests.get(flag_csv, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200 and len(r.content) > 50:
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(r.content)
+                tmp.close()
+                flp = tmp.name
+        except:
+            pass
     if not flp:
         flp = _flag(nac)
 
@@ -272,13 +292,13 @@ def generate_player_report(player_data: dict) -> bytes:
     rp = _radar(player_data)
     if rp:
         try:
-            rw = 100
+            rw = 95
             rx = (210 - rw) / 2
             pdf.image(rp, x=rx, y=y, w=rw)
         except: pass
         _rm(rp)
 
-    y += 100
+    y += 95
 
     # ============================================
     # BLOQUE 3: Metric boxes (fila de cajas)
