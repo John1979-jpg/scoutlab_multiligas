@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+data/raw/
+.DS_Store
+*.egg-info/
+dist/
+build/
+debug_data.csv
