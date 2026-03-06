@@ -198,7 +198,7 @@ def generate_player_report(player_data: dict) -> bytes:
     li = player_data.get("liga", "-")
     nac = str(player_data.get("nacionalidad", "-"))
 
-    y = pdf.get_y()
+    y = pdf.get_y() + 3  # Bajar un poco la cabecera
 
     # ============================================
     # BLOQUE 1: Identidad (foto + nombre + escudo + bandera + valor)
@@ -206,7 +206,13 @@ def generate_player_report(player_data: dict) -> bytes:
     # ============================================
     fp = _dl(player_data.get("foto_url", ""))
     ep = _dl(player_data.get("escudo_url", ""))
-    flp = _flag(nac)
+    # Bandera: primero intentar flag_url del CSV, luego flagcdn.com
+    flp = ""
+    flag_csv = str(player_data.get("flag_url", ""))
+    if flag_csv.startswith("http"):
+        flp = _dl(flag_csv)
+    if not flp:
+        flp = _flag(nac)
 
     if fp:
         try: pdf.image(fp, x=10, y=y, w=20, h=24)
@@ -233,13 +239,13 @@ def generate_player_report(player_data: dict) -> bytes:
     pdf.set_xy(xi, y + 16)
     if flp:
         try:
-            pdf.image(flp, x=xi, y=y + 16.5, h=5)
-            pdf.set_x(xi + 10)
+            pdf.image(flp, x=xi, y=y + 16, h=7)
+            pdf.set_x(xi + 14)
         except: pass
         _rm(flp)
-    pdf.set_font("Helvetica", "", 8)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_text_color(107, 114, 128)
-    pdf.cell(60, 5, nac)
+    pdf.cell(60, 7, nac)
 
     # Valor mercado arriba derecha
     pdf.set_xy(148, y)
