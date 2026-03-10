@@ -99,4 +99,3 @@ John Triguero - Proyecto Final de Master (TFM) - Master en Python Avanzado Aplic
 Sports Data Campus / UCAM
 ```
 
-Cópialo directamente en GitHub editando el README.md. Con eso el repo queda limpio para entregar. ¿Seguimos con el documento marco?
