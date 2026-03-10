@@ -530,31 +530,50 @@ def scrape_all(
         print("\n[ERROR] No se obtuvieron datos de ninguna liga")
         return pd.DataFrame()
 
-    # Concatenar todo
-    result = pd.concat(all_data, ignore_index=True)
+    # Concatenar datos nuevos
+    new_data = pd.concat(all_data, ignore_index=True)
 
     # Calcular metricas derivadas
-    result["participaciones_gol"] = result["goles"].fillna(0).astype(int) + result["asistencias"].fillna(0).astype(int)
-    result["goles_por_90"] = result.apply(
+    new_data["participaciones_gol"] = new_data["goles"].fillna(0).astype(int) + new_data["asistencias"].fillna(0).astype(int)
+    new_data["goles_por_90"] = new_data.apply(
         lambda r: round(r["goles"] / (r["minutos"] / 90), 2) if r["minutos"] > 0 else 0.0, axis=1
     )
-    result["asistencias_por_90"] = result.apply(
+    new_data["asistencias_por_90"] = new_data.apply(
         lambda r: round(r["asistencias"] / (r["minutos"] / 90), 2) if r["minutos"] > 0 else 0.0, axis=1
     )
 
     # Campos faltantes
-    result["temporada"] = "2025/26"
-    result["grupo"] = ""
-    result["rating"] = 0.0
-    result["id"] = range(1, len(result) + 1)
+    new_data["temporada"] = "2025/26"
+    new_data["grupo"] = ""
+    new_data["rating"] = 0.0
 
     for col in ["pie", "altura_cm", "fecha_nacimiento", "posicion", "nacionalidad",
                 "foto_url", "flag_url", "escudo_url"]:
-        if col not in result.columns:
-            result[col] = "" if col != "altura_cm" else 180
+        if col not in new_data.columns:
+            new_data[col] = "" if col != "altura_cm" else 180
 
-    # Eliminar duplicados
-    result = result.drop_duplicates(subset=["nombre", "equipo", "liga"], keep="first")
+    # Eliminar duplicados en datos nuevos
+    new_data = new_data.drop_duplicates(subset=["nombre", "equipo", "liga"], keep="first")
+
+    # --- MERGE con CSV existente (no sobreescribir otras ligas) ---
+    scraped_leagues = new_data["liga"].unique().tolist()
+
+    if output_path and os.path.exists(output_path):
+        try:
+            existing = pd.read_csv(output_path, encoding="utf-8")
+            # Quitar solo las ligas que acabamos de scrapear
+            existing = existing[~existing["liga"].isin(scraped_leagues)]
+            result = pd.concat([existing, new_data], ignore_index=True)
+            print(f"\n  [MERGE] Conservadas {len(existing)} jugadores de otras ligas")
+            print(f"  [MERGE] Anadidos {len(new_data)} jugadores nuevos/actualizados")
+        except Exception as e:
+            print(f"\n  [WARN] No se pudo leer CSV existente ({e}), usando solo datos nuevos")
+            result = new_data
+    else:
+        result = new_data
+
+    # Reasignar IDs
+    result["id"] = range(1, len(result) + 1)
 
     # Resumen
     with_stats = (result["partidos"] > 0).sum()
