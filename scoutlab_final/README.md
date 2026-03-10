@@ -97,5 +97,5 @@ El modelo utiliza un Gradient Boosting Regressor con las siguientes caracteristi
 
 John Triguero - Proyecto Final de Master (TFM) - Master en Python Avanzado Aplicado al Deporte (MPAD)
 Sports Data Campus / UCAM
-```
+
 
