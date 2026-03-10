@@ -1,14 +1,17 @@
 """
 01 - Adquisicion de Datos
 =========================
-Script de web scraping para obtener datos de jugadores de 1a RFEF
-desde Transfermarkt (valores de mercado) y BeSoccer (estadisticas).
+Script de web scraping para obtener datos de jugadores de las principales
+ligas europeas desde Transfermarkt (valores de mercado y estadisticas).
 
 Fuentes:
 - Transfermarkt: https://www.transfermarkt.es
-- BeSoccer: https://es.besoccer.com
 
-NOTA: Respetar los terminos de uso de cada sitio web.
+Ligas incluidas:
+- Premier League, LaLiga, Serie A, Bundesliga, Ligue 1,
+  Eredivisie, Super Lig, Liga Portugal
+
+NOTA: Respetar los terminos de uso del sitio web.
 Usar delays entre peticiones para no sobrecargar los servidores.
 """
 
@@ -29,6 +32,18 @@ HEADERS = {
 }
 DELAY = 3  # segundos entre peticiones
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
+
+# Ligas europeas con sus IDs de Transfermarkt
+LEAGUES = {
+    "Premier League": {"country": "Inglaterra", "id": "GB1"},
+    "LaLiga": {"country": "Espana", "id": "ES1"},
+    "Serie A": {"country": "Italia", "id": "IT1"},
+    "Bundesliga": {"country": "Alemania", "id": "L1"},
+    "Ligue 1": {"country": "Francia", "id": "FR1"},
+    "Eredivisie": {"country": "Paises Bajos", "id": "NL1"},
+    "Super Lig": {"country": "Turquia", "id": "TR1"},
+    "Liga Portugal": {"country": "Portugal", "id": "PO1"},
+}
 
 
 def scrape_transfermarkt_team(team_url: str) -> list:
@@ -110,6 +125,71 @@ def scrape_transfermarkt_team(team_url: str) -> list:
     return players
 
 
+def scrape_team_stats(team_url: str) -> list:
+    """
+    Extrae las estadisticas de rendimiento (partidos, goles, asistencias,
+    tarjetas, minutos) de una plantilla desde Transfermarkt.
+
+    URL: /leistungsdaten/verein/ID/plus/1
+    Columnas: Col 8=partidos, Col 9=goles, Col 10=asistencias,
+              Col 11=tarjetas amarillas, Col 13=tarjetas rojas, Col 17=minutos
+    """
+    try:
+        response = requests.get(team_url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print("Error al acceder a stats: " + str(e))
+        return []
+
+    soup = BeautifulSoup(response.text, "lxml")
+    stats = []
+
+    table = soup.find("table", class_="items")
+    if not table:
+        return []
+
+    rows = table.find_all("tr", class_=["odd", "even"])
+    for row in rows:
+        try:
+            cells = row.find_all("td")
+            name_cell = row.find("td", class_="hauptlink")
+            if not name_cell:
+                continue
+
+            nombre = name_cell.find("a").text.strip()
+
+            stats.append({
+                "nombre": nombre,
+                "partidos": _safe_int(cells, 8),
+                "goles": _safe_int(cells, 9),
+                "asistencias": _safe_int(cells, 10),
+                "tarjetas_amarillas": _safe_int(cells, 11),
+                "tarjetas_rojas": _safe_int(cells, 13),
+                "minutos": _parse_minutes(cells, 17),
+            })
+        except Exception:
+            continue
+
+    return stats
+
+
+def _safe_int(cells, idx):
+    """Extrae un entero de una celda de forma segura."""
+    try:
+        return int(cells[idx].text.strip().replace("-", "0"))
+    except (IndexError, ValueError):
+        return 0
+
+
+def _parse_minutes(cells, idx):
+    """Parsea minutos jugados (formato: 1.234')."""
+    try:
+        text = cells[idx].text.strip().replace(".", "").replace("'", "")
+        return int(text) if text and text != "-" else 0
+    except (IndexError, ValueError):
+        return 0
+
+
 def _parse_market_value(text: str) -> int:
     """Convierte texto de valor de mercado a entero."""
     text = text.replace("\xa0", "").strip()
@@ -129,90 +209,75 @@ def _parse_market_value(text: str) -> int:
         return 0
 
 
-def scrape_besoccer_stats(competition_url: str) -> list:
-    """
-    Extrae estadisticas de jugadores desde BeSoccer.
-    """
-    try:
-        response = requests.get(competition_url, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        print("Error al acceder a BeSoccer: " + str(e))
-        return []
-
-    soup = BeautifulSoup(response.text, "lxml")
-    stats = []
-
-    # La estructura de BeSoccer varia, este es un esquema base
-    # que debe adaptarse segun la estructura actual del sitio
-    ranking_tables = soup.find_all("table")
-    for table in ranking_tables:
-        rows = table.find_all("tr")
-        for row in rows[1:]:  # Saltar cabecera
-            cells = row.find_all("td")
-            if len(cells) >= 4:
-                try:
-                    nombre = cells[1].text.strip()
-                    equipo = cells[2].text.strip() if len(cells) > 2 else ""
-                    valor = cells[3].text.strip() if len(cells) > 3 else "0"
-                    stats.append({
-                        "nombre": nombre,
-                        "equipo": equipo,
-                        "valor": valor,
-                    })
-                except Exception:
-                    continue
-
-    return stats
-
-
 def run_full_scraping():
     """
-    Ejecuta el scraping completo de todas las fuentes.
+    Ejecuta el scraping completo de todas las ligas europeas desde Transfermarkt.
+    Para cada equipo se scrapean los valores de mercado (/kader/verein/ID/plus/1)
+    y las estadisticas de rendimiento (/leistungsdaten/verein/ID/plus/1).
     Guarda los datos crudos en data/raw/.
     """
     os.makedirs(RAW_DIR, exist_ok=True)
 
-    # URLs de equipos de 1a RFEF en Transfermarkt
-    # Estos son ejemplos - hay que completar con todos los equipos
-    TEAM_URLS = {
-        "Racing Ferrol": "https://www.transfermarkt.es/racing-club-de-ferrol/kader/verein/1176",
-        "SD Ponferradina": "https://www.transfermarkt.es/sd-ponferradina/kader/verein/3160",
-        "Hercules CF": "https://www.transfermarkt.es/hercules-cf/kader/verein/2286",
-        # Agregar el resto de equipos aqui
-    }
-
     all_players = []
-    for team_name, url in TEAM_URLS.items():
-        print("Scraping " + team_name + "...")
-        players = scrape_transfermarkt_team(url)
-        for p in players:
-            p["equipo"] = team_name
-        all_players.extend(players)
-        time.sleep(DELAY)
+
+    for liga_name, liga_info in LEAGUES.items():
+        print("\n" + "=" * 50)
+        print("Scraping " + liga_name + " (" + liga_info["country"] + ")...")
+        print("=" * 50)
+
+        base_url = "https://www.transfermarkt.es"
+        liga_url = base_url + "/x/startseite/wettbewerb/" + liga_info["id"]
+
+        try:
+            response = requests.get(liga_url, headers=HEADERS, timeout=15)
+            soup = BeautifulSoup(response.text, "lxml")
+            team_links = soup.select("td.hauptlink a[href*='/verein/']")
+
+            for link in team_links:
+                team_name = link.text.strip()
+                team_href = link.get("href", "")
+                if not team_href or not team_name:
+                    continue
+
+                team_id = team_href.split("/verein/")[1].split("/")[0] if "/verein/" in team_href else ""
+                if not team_id:
+                    continue
+
+                # URL de valores de mercado
+                values_url = base_url + "/x/kader/verein/" + team_id + "/plus/1"
+                # URL de estadisticas
+                stats_url = base_url + "/x/leistungsdaten/verein/" + team_id + "/plus/1"
+
+                print("  " + team_name + "...")
+
+                # Scrape valores
+                players = scrape_transfermarkt_team(values_url)
+                # Scrape stats
+                player_stats = scrape_team_stats(stats_url)
+
+                # Merge por nombre
+                stats_dict = {s["nombre"]: s for s in player_stats}
+                for p in players:
+                    p["equipo"] = team_name
+                    p["liga"] = liga_name
+                    p["pais"] = liga_info["country"]
+                    if p["nombre"] in stats_dict:
+                        p.update(stats_dict[p["nombre"]])
+
+                all_players.extend(players)
+                time.sleep(DELAY)
+
+        except Exception as e:
+            print("Error scraping " + liga_name + ": " + str(e))
+            continue
 
     if all_players:
         df = pd.DataFrame(all_players)
         output_path = os.path.join(RAW_DIR, "transfermarkt_raw.csv")
         df.to_csv(output_path, index=False)
-        print("Guardados " + str(len(df)) + " jugadores en " + output_path)
+        print("\nGuardados " + str(len(df)) + " jugadores en " + output_path)
     else:
-        print("No se obtuvieron datos de Transfermarkt")
-
-    # BeSoccer rankings
-    BESOCCER_URLS = {
-        "goleadores": "https://es.besoccer.com/competicion/rankings/primera_division_rfef/2025",
-    }
-
-    for stat_type, url in BESOCCER_URLS.items():
-        print("Scraping BeSoccer " + stat_type + "...")
-        stats = scrape_besoccer_stats(url)
-        if stats:
-            df_stats = pd.DataFrame(stats)
-            output_path = os.path.join(RAW_DIR, "besoccer_" + stat_type + ".csv")
-            df_stats.to_csv(output_path, index=False)
-            print("Guardados " + str(len(df_stats)) + " registros")
-        time.sleep(DELAY)
+        print("\nNo se obtuvieron datos de Transfermarkt")
 
 
 if __name__ == "__main__":

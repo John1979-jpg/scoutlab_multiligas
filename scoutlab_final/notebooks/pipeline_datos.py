@@ -1,19 +1,16 @@
 """
 Pipeline completo de adquisicion de datos ScoutLab
 =====================================================
-Ejecuta el scraping de WhoScored (stats) y Transfermarkt (valores),
-fusiona los datos y entrena el modelo ML.
+Ejecuta el scraping de Transfermarkt (valores + stats),
+procesa los datos y entrena el modelo ML.
 
 Uso:
     python notebooks/pipeline_datos.py                     # Pipeline completo
-    python notebooks/pipeline_datos.py --solo-whoscored    # Solo WhoScored
     python notebooks/pipeline_datos.py --solo-transfermarkt # Solo Transfermarkt
-    python notebooks/pipeline_datos.py --solo-merge        # Solo merge (CSVs ya existen)
     python notebooks/pipeline_datos.py --solo-ml           # Solo entrenar modelo
 
 Prerequisitos:
     pip install -r requirements.txt
-    pip install -r requirements_scraping.txt
 """
 
 import sys
@@ -30,18 +27,11 @@ PROCESSED_DIR = os.path.join(ROOT, "data", "processed")
 os.makedirs(RAW_DIR, exist_ok=True)
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-WS_CSV = os.path.join(RAW_DIR, "whoscored_stats.csv")
-TM_CSV = os.path.join(RAW_DIR, "transfermarkt_values.csv")
 OUTPUT_CSV = os.path.join(PROCESSED_DIR, "jugadores.csv")
 
 
-def paso_1_whoscored():
-    """Paso 1: Ya no se usa WhoScored. Redirige a Transfermarkt."""
-    print("\n[INFO] WhoScored ya no se usa. Ejecuta --solo-transfermarkt")
-
-
-def paso_2_transfermarkt():
-    """Paso 2: Scrapear stats + valores de Transfermarkt."""
+def paso_1_transfermarkt():
+    """Paso 1: Scrapear stats + valores de Transfermarkt."""
     print("\n" + "=" * 60)
     print("SCRAPING TRANSFERMARKT (Stats + Valores de mercado)")
     print("=" * 60)
@@ -61,15 +51,10 @@ def paso_2_transfermarkt():
     return df
 
 
-def paso_3_merge():
-    """Paso 3: Ya no se necesita merge separado."""
-    print("\n[INFO] El merge ya esta integrado en el scraper de Transfermarkt.")
-
-
-def paso_4_modelo_ml():
-    """Paso 4: Entrenar modelo ML sobre datos fusionados."""
+def paso_2_modelo_ml():
+    """Paso 2: Entrenar modelo ML sobre datos procesados."""
     print("\n" + "=" * 60)
-    print("PASO 4: ENTRENAR MODELO ML")
+    print("PASO 2: ENTRENAR MODELO ML")
     print("=" * 60)
 
     import pandas as pd
@@ -78,7 +63,7 @@ def paso_4_modelo_ml():
 
     if not os.path.exists(OUTPUT_CSV):
         print(f"[ERROR] No existe: {OUTPUT_CSV}")
-        print("  Ejecuta primero el merge")
+        print("  Ejecuta primero el scraping")
         return None
 
     df = pd.read_csv(OUTPUT_CSV)
@@ -109,12 +94,8 @@ def paso_4_modelo_ml():
 
 def main():
     parser = argparse.ArgumentParser(description="Pipeline de datos ScoutLab")
-    parser.add_argument("--solo-whoscored", action="store_true",
-                        help="Solo scrapear WhoScored")
     parser.add_argument("--solo-transfermarkt", action="store_true",
                         help="Solo scrapear Transfermarkt")
-    parser.add_argument("--solo-merge", action="store_true",
-                        help="Solo fusionar datos (CSVs deben existir)")
     parser.add_argument("--solo-ml", action="store_true",
                         help="Solo entrenar modelo ML")
     args = parser.parse_args()
@@ -125,18 +106,14 @@ def main():
 
     total_start = time.time()
 
-    if args.solo_whoscored:
-        print("[INFO] WhoScored ya no se usa. Usa --solo-transfermarkt")
-    elif args.solo_transfermarkt:
-        paso_2_transfermarkt()
-    elif args.solo_merge:
-        print("[INFO] El merge ya esta integrado en el scraper")
+    if args.solo_transfermarkt:
+        paso_1_transfermarkt()
     elif args.solo_ml:
-        paso_4_modelo_ml()
+        paso_2_modelo_ml()
     else:
         # Pipeline completo: Transfermarkt + ML
-        paso_2_transfermarkt()
-        paso_4_modelo_ml()
+        paso_1_transfermarkt()
+        paso_2_modelo_ml()
 
     total_elapsed = time.time() - total_start
     print(f"\n{'='*60}")

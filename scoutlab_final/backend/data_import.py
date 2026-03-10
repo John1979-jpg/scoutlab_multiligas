@@ -1,6 +1,6 @@
 """
 ScoutLab - Módulo de importación de datos
-Permite importar datos desde CSV, HTML de WhoScored o actualizar desde Transfermarkt
+Permite importar datos desde CSV o actualizar desde Transfermarkt
 """
 
 import streamlit as st
@@ -253,10 +253,6 @@ LEAGUE_MAPPING = {
     "championship": "Championship",
     "usa-mls": "MLS",
     "mls": "MLS",
-    "spain-primera-division-rfef": "1a RFEF",
-    "primera-division-rfef": "1a RFEF",
-    "segunda-division-rfef": "2a RFEF",
-    "tercera-division-rfef": "3a RFEF",
 }
 
 

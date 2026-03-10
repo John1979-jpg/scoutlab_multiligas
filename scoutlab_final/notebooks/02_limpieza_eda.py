@@ -1,8 +1,8 @@
 """
 02 - Limpieza de Datos y EDA
 =============================
-Procesamiento de datos crudos, limpieza, analisis exploratorio,
-y generacion de metricas derivadas.
+Procesamiento de datos crudos de Transfermarkt, limpieza,
+analisis exploratorio, y generacion de metricas derivadas.
 """
 
 import pandas as pd
@@ -14,28 +14,16 @@ PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed
 
 
 def load_raw_data() -> pd.DataFrame:
-    """Carga y combina los datos crudos de todas las fuentes."""
+    """Carga los datos crudos de Transfermarkt."""
     transfermarkt_path = os.path.join(RAW_DIR, "transfermarkt_raw.csv")
-    besoccer_path = os.path.join(RAW_DIR, "besoccer_goleadores.csv")
-
-    dfs = []
 
     if os.path.exists(transfermarkt_path):
-        df_tm = pd.read_csv(transfermarkt_path)
-        print("Transfermarkt: " + str(len(df_tm)) + " registros")
-        dfs.append(df_tm)
+        df = pd.read_csv(transfermarkt_path)
+        print("Transfermarkt: " + str(len(df)) + " registros")
+        return df
 
-    if os.path.exists(besoccer_path):
-        df_bs = pd.read_csv(besoccer_path)
-        print("BeSoccer: " + str(len(df_bs)) + " registros")
-        # Merge por nombre de jugador (requiere normalizacion)
-        # Aqui se implementaria la logica de matching
-
-    if not dfs:
-        print("No se encontraron datos crudos. Usando datos de ejemplo.")
-        return None
-
-    return pd.concat(dfs, ignore_index=True) if dfs else None
+    print("No se encontraron datos crudos.")
+    return None
 
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -84,11 +72,11 @@ def generate_metrics(df: pd.DataFrame) -> pd.DataFrame:
 
 def run_eda():
     """Ejecuta el pipeline completo de limpieza y EDA."""
-    print("Cargando datos crudos...")
+    print("Cargando datos crudos de Transfermarkt...")
     df = load_raw_data()
 
     if df is None:
-        print("No hay datos crudos. El sistema usara datos de ejemplo generados automaticamente.")
+        print("No hay datos crudos disponibles.")
         return
 
     print("Limpiando datos...")
@@ -117,6 +105,10 @@ def run_eda():
     print("\nDistribucion de edades:")
     if "edad" in df.columns:
         print(df["edad"].describe().to_string())
+
+    print("\nDistribucion por liga:")
+    if "liga" in df.columns:
+        print(df["liga"].value_counts().to_string())
 
 
 if __name__ == "__main__":
