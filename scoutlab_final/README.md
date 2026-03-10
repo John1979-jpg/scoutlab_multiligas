@@ -1,6 +1,3 @@
-Aquí tienes el README corregido. Cambios: quitado BeSoccer, corregida la estructura de carpetas (`views/` en vez de `pages/`), quitado `00_generar_datos_sinteticos.py`, quitado "WhoScored", y añadido tu nombre.
-
-```markdown
 # ScoutLab
 
 Plataforma de scouting y analisis de rendimiento para jugadores de futbol profesional en multiples ligas europeas.
